@@ -241,19 +241,38 @@ function scrollstateHistoryHandler(href) {
 }
 </script>
 
-{#if componentParams}
-    <svelte:component
-    this="{component}"
-    params="{componentParams}"
-    on:routeEvent
-    {...props}
-    />
+{#if wrapper}
+  <svelte:component this={wrapper}>
+    {#if componentParams}
+        <svelte:component
+        this="{component}"
+        params="{componentParams}"
+        on:routeEvent
+        {...props}
+        />
+    {:else}
+        <svelte:component
+        this="{component}"
+        on:routeEvent
+        {...props}
+        />
+    {/if}
+  </svelte:component>
 {:else}
-    <svelte:component
-    this="{component}"
-    on:routeEvent
-    {...props}
-    />
+  {#if componentParams}
+      <svelte:component
+      this="{component}"
+      params="{componentParams}"
+      on:routeEvent
+      {...props}
+      />
+  {:else}
+      <svelte:component
+      this="{component}"
+      on:routeEvent
+      {...props}
+      />
+  {/if}
 {/if}
 
 <script>
@@ -299,7 +318,7 @@ class RouteItem {
      * @param {SvelteComponent|WrappedComponent} component - Svelte component for the route, optionally wrapped
      */
     constructor(path, component) {
-        if (!component || (typeof component != 'function' && (typeof component != 'object' || component._sveltesparouter !== true))) {
+        if (!component || (typeof component != 'function' && (typeof component != 'object' || !(component._sveltesparouter === true || component._route === true)))) {
             throw Error('Invalid component object')
         }
 
@@ -316,7 +335,14 @@ class RouteItem {
         this.path = path
 
         // Check if the component is wrapped and we have conditions
-        if (typeof component == 'object' && component._sveltesparouter === true) {
+        if (typeof component == 'object' && component._route === true) {
+            this.component = () => Promise.resolve(component.component);
+            this.conditions = component.conditions || []
+            this.userData = component.userData
+            this.wrapper = component.wrapper;
+            this.props = component.props || {}
+        }
+        else if (typeof component == 'object' && component._sveltesparouter === true) {
             this.component = component.component
             this.conditions = component.conditions || []
             this.userData = component.userData
@@ -434,6 +460,7 @@ else {
 }
 
 // Props for the component to render
+let wrapper = null;
 let component = null
 let componentParams = null
 let props = {}
@@ -555,6 +582,9 @@ const unsubscribeLoc = loc.subscribe(async (newLoc) => {
                 // Don't update the component, just exit
                 return
             }
+
+            // Is Wrapped Component?
+            wrapper = routesList[i].wrapper;
 
             // If there is a "default" property, which is used by async routes, then pick that
             component = (loaded && loaded.default) || loaded
